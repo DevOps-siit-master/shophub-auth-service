@@ -1,0 +1,40 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: shophub-auth-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DATABASE_USER:-shophub}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-shophub}
+      POSTGRES_DB: ${DATABASE_NAME:-shophub_auth}
+    ports:
+      # Host 5433 -> container 5432 (host 5432 is often taken by a local Postgres).
+      - '5433:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${DATABASE_USER:-shophub}']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  auth-service:
+    build: .
+    container_name: shophub-auth-service
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_HOST: postgres
+      DATABASE_PORT: 5432
+      DATABASE_USER: ${DATABASE_USER:-shophub}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD:-shophub}
+      DATABASE_NAME: ${DATABASE_NAME:-shophub_auth}
+    ports:
+      - '3000:3000'
+
+volumes:
+  pgdata:
