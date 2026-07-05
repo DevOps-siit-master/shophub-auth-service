@@ -7,10 +7,10 @@ import { AuthService } from './auth.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
 
 /**
- * Email/password authentication (spec requirement 1.1).
+ * Email/password authentication
  *
  * Secrets and TTLs are supplied per sign/verify from `ConfigService`, so
- * `JwtModule` is registered without global options. Web3/SIWE arrives in PR5.
+ * `JwtModule` is registered without global options.
  */
 @Module({
   imports: [UsersModule, PassportModule, JwtModule.register({})],
