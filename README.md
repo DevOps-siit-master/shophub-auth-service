@@ -21,7 +21,7 @@ Supports two authentication methods:
 
 ## Local development
 
-Requirements: Node.js 22+, Docker.
+Requirements: Node.js 24+, Docker.
 
 ```bash
 # 1. Install dependencies
@@ -33,7 +33,10 @@ cp .env.example .env
 # 3. Start PostgreSQL (host port 5433)
 docker compose up -d postgres
 
-# 4. Run the service in watch mode
+# 4. Apply database migrations
+npm run migration:run
+
+# 5. Run the service in watch mode
 npm run start:dev
 ```
 
@@ -56,6 +59,24 @@ docker compose up --build
 | `npm run lint` | ESLint check |
 | `npm test` | Unit tests |
 | `npm run test:e2e` | Integration tests (Testcontainers) |
+| `npm run migration:run` | Apply pending TypeORM migrations |
+| `npm run migration:generate -- src/database/migrations/<Name>` | Generate a migration from entity changes |
+| `npm run migration:revert` | Roll back the last migration |
+
+## Authentication API
+
+Email/password auth (SIWE/Web3 arrives in a later PR). All request/response bodies
+are documented and can be tried out in Swagger at `/api/docs`.
+
+| Method & path | Auth | Body | Result |
+| --- | --- | --- | --- |
+| `POST /auth/register` | — | `{ email, password }` | `201` + `{ accessToken, refreshToken }` (`409` if email taken) |
+| `POST /auth/login` | — | `{ email, password }` | `200` + `{ accessToken, refreshToken }` (`401` on bad credentials) |
+| `POST /auth/refresh` | — | `{ refreshToken }` | `200` + a new `{ accessToken, refreshToken }` (`401` if invalid/expired) |
+| `GET /auth/me` | Bearer access token | — | `200` + `{ userId, email }` (`401` if missing/invalid) |
+
+Tokens are stateless JWTs signed with separate access/refresh secrets. Configure via
+`JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`, `JWT_ACCESS_TTL`, `JWT_REFRESH_TTL` (see `.env.example`).
 
 ## Contributing (Trunk Based Development)
 
@@ -73,6 +94,7 @@ This repo strictly follows [Trunk Based Development](https://trunkbaseddevelopme
 src/
 ├── config/     # env validation
 ├── health/     # health/liveness endpoint
-├── users/      # User entity + service (PR2)
-└── auth/       # auth controller/service, JWT, SIWE (PR3–PR5)
+├── users/      # User entity + service
+└── auth/       # email/password auth: controller, service, JWT strategy + guard
+                #   Web3/SIWE (to be added)
 ```
