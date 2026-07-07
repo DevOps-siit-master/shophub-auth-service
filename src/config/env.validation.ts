@@ -21,4 +21,8 @@ export const validationSchema = Joi.object({
   JWT_REFRESH_SECRET: Joi.string().required(),
   JWT_ACCESS_TTL: Joi.string().default('15m'),
   JWT_REFRESH_TTL: Joi.string().default('7d'),
+
+  // Web3 SIWE — the domain/URI a signed SIWE message is validated against
+  SIWE_DOMAIN: Joi.string().default('localhost:3000'),
+  SIWE_URI: Joi.string().uri().default('http://localhost:3000'),
 });
