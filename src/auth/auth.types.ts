@@ -4,7 +4,8 @@
  */
 export interface JwtPayload {
   sub: string;
-  email: string;
+  email?: string;
+  walletAddress?: string;
 }
 
 /**
@@ -13,5 +14,6 @@ export interface JwtPayload {
  */
 export interface AuthUser {
   userId: string;
-  email: string;
+  email?: string;
+  walletAddress?: string;
 }
