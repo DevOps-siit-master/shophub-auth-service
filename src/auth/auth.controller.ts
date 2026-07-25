@@ -23,11 +23,17 @@ import { RefreshDto } from './dto/refresh.dto';
 import { RegisterDto } from './dto/register.dto';
 import { TokensDto } from './dto/tokens.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { NonceDto } from './siwe/dto/nonce.dto';
+import { SiweVerifyDto } from './siwe/dto/siwe-verify.dto';
+import { SiweService } from './siwe/siwe.service';
 
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly siweService: SiweService,
+  ) {}
 
   @Post('register')
   @ApiCreatedResponse({
@@ -62,5 +68,24 @@ export class AuthController {
   @ApiUnauthorizedResponse({ description: 'Missing or invalid access token' })
   me(@CurrentUser() user: AuthUser): AuthUser {
     return user;
+  }
+
+  @Get('siwe/nonce')
+  @ApiOkResponse({
+    type: NonceDto,
+    description: 'A single-use nonce to embed in the SIWE message',
+  })
+  siweNonce(): Promise<NonceDto> {
+    return this.siweService.createNonce();
+  }
+
+  @Post('siwe/verify')
+  @HttpCode(HttpStatus.OK)
+  @ApiOkResponse({ type: TokensDto })
+  @ApiUnauthorizedResponse({
+    description: 'Invalid nonce or signature verification failed',
+  })
+  siweVerify(@Body() dto: SiweVerifyDto): Promise<TokensDto> {
+    return this.siweService.verify(dto);
   }
 }

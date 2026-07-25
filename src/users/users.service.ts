@@ -25,6 +25,37 @@ export class UsersService {
     return this.usersRepository.findOne({ where: { id } });
   }
 
+  findByWalletAddress(walletAddress: string): Promise<User | null> {
+    return this.usersRepository.findOne({
+      where: { walletAddress: this.normalizeWallet(walletAddress) },
+    });
+  }
+
+  /**
+   * Resolves the wallet-only account for a SIWE sign-in, creating it on first
+   * login. Idempotent: concurrent first logins converge on the same row.
+   */
+  async findOrCreateByWallet(walletAddress: string): Promise<User> {
+    const normalized = this.normalizeWallet(walletAddress);
+
+    const existing = await this.findByWalletAddress(normalized);
+    if (existing) {
+      return existing;
+    }
+
+    try {
+      const user = this.usersRepository.create({ walletAddress: normalized });
+      return await this.usersRepository.save(user);
+    } catch {
+      // Lost a race against a concurrent first login — the row now exists.
+      const user = await this.findByWalletAddress(normalized);
+      if (!user) {
+        throw new ConflictException('Could not create wallet account');
+      }
+      return user;
+    }
+  }
+
   async create(data: CreateUserData): Promise<User> {
     const email = this.normalizeEmail(data.email);
 
@@ -42,5 +73,9 @@ export class UsersService {
 
   private normalizeEmail(email: string): string {
     return email.trim().toLowerCase();
+  }
+
+  private normalizeWallet(walletAddress: string): string {
+    return walletAddress.trim().toLowerCase();
   }
 }

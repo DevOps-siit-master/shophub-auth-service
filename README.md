@@ -65,18 +65,34 @@ docker compose up --build
 
 ## Authentication API
 
-Email/password auth (SIWE/Web3 arrives in a later PR). All request/response bodies
-are documented and can be tried out in Swagger at `/api/docs`.
+Email/password **and** Web3 (SIWE) auth. All request/response bodies are
+documented and can be tried out in Swagger at `/api/docs`.
 
 | Method & path | Auth | Body | Result |
 | --- | --- | --- | --- |
 | `POST /auth/register` | — | `{ email, password }` | `201` + `{ accessToken, refreshToken }` (`409` if email taken) |
 | `POST /auth/login` | — | `{ email, password }` | `200` + `{ accessToken, refreshToken }` (`401` on bad credentials) |
 | `POST /auth/refresh` | — | `{ refreshToken }` | `200` + a new `{ accessToken, refreshToken }` (`401` if invalid/expired) |
-| `GET /auth/me` | Bearer access token | — | `200` + `{ userId, email }` (`401` if missing/invalid) |
+| `GET /auth/me` | Bearer access token | — | `200` + `{ userId, email?, walletAddress? }` (`401` if missing/invalid) |
+| `GET /auth/siwe/nonce` | — | — | `200` + `{ nonce }` to embed in the SIWE message |
+| `POST /auth/siwe/verify` | — | `{ message, signature }` | `200` + `{ accessToken, refreshToken }` (`401` if nonce/signature invalid) |
 
 Tokens are stateless JWTs signed with separate access/refresh secrets. Configure via
 `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`, `JWT_ACCESS_TTL`, `JWT_REFRESH_TTL` (see `.env.example`).
+
+### Web3 (SIWE) sign-in
+
+Sign-In With Ethereum (EIP-4361) authenticates a **wallet-only** account:
+
+1. `GET /auth/siwe/nonce` → a single-use nonce (stored server-side, 5-min TTL).
+2. The client builds an EIP-4361 message embedding that nonce and has the wallet
+   sign it.
+3. `POST /auth/siwe/verify` with `{ message, signature }` — the service validates
+   the signature and domain (`SIWE_DOMAIN`), consumes the nonce (replay-proof),
+   finds or creates the account for that address, and returns the usual token pair.
+
+Wallet and email/password accounts are **separate** (account linking is a later PR).
+Configure via `SIWE_DOMAIN` / `SIWE_URI`.
 
 ## Contributing (Trunk Based Development)
 
@@ -96,5 +112,5 @@ src/
 ├── health/     # health/liveness endpoint
 ├── users/      # User entity + service
 └── auth/       # email/password auth: controller, service, JWT strategy + guard
-                #   Web3/SIWE (to be added)
+                #   siwe/  Web3 (SIWE) nonce + verify
 ```

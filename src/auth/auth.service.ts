@@ -36,7 +36,11 @@ export class AuthService {
    */
   async login(dto: LoginDto): Promise<TokensDto> {
     const user = await this.usersService.findByEmail(dto.email);
-    if (!user || !(await argon2.verify(user.passwordHash, dto.password))) {
+    if (
+      !user ||
+      !user.passwordHash ||
+      !(await argon2.verify(user.passwordHash, dto.password))
+    ) {
       throw new UnauthorizedException('Invalid credentials');
     }
     return this.issueTokens(user);
@@ -62,8 +66,18 @@ export class AuthService {
     return this.issueTokens(user);
   }
 
-  private async issueTokens(user: User): Promise<TokensDto> {
-    const payload: JwtPayload = { sub: user.id, email: user.email };
+  /**
+   * Signs a fresh access/refresh pair for a user. Shared by every sign-in
+   * path (email/password and SIWE), so the token shape stays identical.
+   */
+  async issueTokens(user: User): Promise<TokensDto> {
+    const payload: JwtPayload = { sub: user.id };
+    if (user.email) {
+      payload.email = user.email;
+    }
+    if (user.walletAddress) {
+      payload.walletAddress = user.walletAddress;
+    }
 
     const [accessToken, refreshToken] = await Promise.all([
       this.signToken(payload, 'JWT_ACCESS_SECRET', 'JWT_ACCESS_TTL'),
