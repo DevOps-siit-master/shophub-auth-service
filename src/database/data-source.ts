@@ -5,6 +5,8 @@ import { buildDataSourceOptions } from './typeorm-options';
 
 // Standalone DataSource used by the TypeORM CLI (migration:generate/run/revert).
 // The Nest app builds its options from ConfigService instead (see AppModule).
+// dotenv is a runtime dependency so the in-cluster migration Job, which runs
+// this compiled file, can resolve it; locally it loads a developer .env.
 loadEnv();
 
 const dataSource = new DataSource(
