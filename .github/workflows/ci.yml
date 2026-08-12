@@ -35,3 +35,7 @@ jobs:
       - run: npm run lint
       - run: npm run build
       - run: npm test
+      # Integration tests spin up a throwaway PostgreSQL via Testcontainers;
+      # the ubuntu-latest runner ships with a running Docker daemon.
+      - name: Integration tests (Testcontainers)
+        run: npm run test:e2e
