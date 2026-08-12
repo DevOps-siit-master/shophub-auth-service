@@ -28,6 +28,11 @@
     "migration:revert": "npm run typeorm -- migration:revert",
     "prepare": "husky"
   },
+  "overrides": {
+    "@nestjs/swagger": {
+      "js-yaml": "5.2.2"
+    }
+  },
   "dependencies": {
     "@nestjs/common": "^11.0.1",
     "@nestjs/config": "^4.0.4",
