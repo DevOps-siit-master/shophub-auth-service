@@ -9,6 +9,7 @@ import { App } from 'supertest/types';
 import { DataSource } from 'typeorm';
 import { TokensDto } from './../src/auth/dto/tokens.dto';
 import { AuthUser } from './../src/auth/auth.types';
+import { SiweService } from './../src/auth/siwe/siwe.service';
 
 /**
  * Full email/password auth flow against a throwaway PostgreSQL container.
@@ -19,6 +20,13 @@ describe('Auth (e2e)', () => {
   let container: StartedPostgreSqlContainer;
 
   const credentials = { email: 'alice@example.com', password: 'S3curePass!' };
+  const siwe = {
+    createNonce: jest.fn().mockResolvedValue({ nonce: 'e2e-nonce' }),
+    verify: jest.fn().mockResolvedValue({
+      accessToken: 'siwe-access-token',
+      refreshToken: 'siwe-refresh-token',
+    }),
+  };
 
   beforeAll(async () => {
     container = await new PostgreSqlContainer('postgres:16-alpine').start();
@@ -41,7 +49,10 @@ describe('Auth (e2e)', () => {
     const { AppModule } = require('./../src/app.module') as AppModuleExports;
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
-    }).compile();
+    })
+      .overrideProvider(SiweService)
+      .useValue(siwe)
+      .compile();
 
     app = moduleFixture.createNestApplication();
     app.useGlobalPipes(
@@ -137,5 +148,24 @@ describe('Auth (e2e)', () => {
       .expect(200);
 
     expect((res.body as TokensDto).accessToken).toEqual(expect.any(String));
+  });
+
+  it('gets a SIWE nonce and exchanges a signed message for tokens', async () => {
+    await request(app.getHttpServer())
+      .get('/auth/siwe/nonce')
+      .expect(200)
+      .expect({ nonce: 'e2e-nonce' });
+
+    const payload = { message: 'signed-message', signature: '0xsig' };
+    await request(app.getHttpServer())
+      .post('/auth/siwe/verify')
+      .send(payload)
+      .expect(200)
+      .expect({
+        accessToken: 'siwe-access-token',
+        refreshToken: 'siwe-refresh-token',
+      });
+
+    expect(siwe.verify).toHaveBeenCalledWith(payload);
   });
 });
