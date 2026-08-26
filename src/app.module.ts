@@ -7,6 +7,7 @@ import { AuthModule } from './auth/auth.module';
 import { validationSchema } from './config/env.validation';
 import { buildDataSourceOptions } from './database/typeorm-options';
 import { HealthModule } from './health/health.module';
+import { MetricsModule } from './metrics/metrics.module';
 import { UsersModule } from './users/users.module';
 
 @Module({
@@ -27,6 +28,7 @@ import { UsersModule } from './users/users.module';
         }),
     }),
     HealthModule,
+    MetricsModule,
     UsersModule,
     AuthModule,
   ],
