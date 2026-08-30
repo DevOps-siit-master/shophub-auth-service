@@ -26,7 +26,7 @@ export class AuthService {
     const user = await this.usersService.create({
       email: dto.email,
       passwordHash,
-      role: dto.role,
+      role: dto.role ?? 'shop_owner',
     });
     return this.issueTokens(user);
   }
@@ -37,10 +37,12 @@ export class AuthService {
    */
   async login(dto: LoginDto): Promise<TokensDto> {
     const user = await this.usersService.findByEmail(dto.email);
+    const role = dto.role ?? 'shop_owner';
+
     if (
       !user ||
       !user.passwordHash ||
-      user.role !== dto.role ||
+      user.role !== role ||
       !(await argon2.verify(user.passwordHash, dto.password))
     ) {
       throw new UnauthorizedException('Invalid credentials');
