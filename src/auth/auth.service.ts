@@ -26,6 +26,7 @@ export class AuthService {
     const user = await this.usersService.create({
       email: dto.email,
       passwordHash,
+      role: dto.role,
     });
     return this.issueTokens(user);
   }
@@ -39,6 +40,7 @@ export class AuthService {
     if (
       !user ||
       !user.passwordHash ||
+      user.role !== dto.role ||
       !(await argon2.verify(user.passwordHash, dto.password))
     ) {
       throw new UnauthorizedException('Invalid credentials');
@@ -71,7 +73,10 @@ export class AuthService {
    * path (email/password and SIWE), so the token shape stays identical.
    */
   async issueTokens(user: User): Promise<TokensDto> {
-    const payload: JwtPayload = { sub: user.id };
+    const payload: JwtPayload = {
+      sub: user.id,
+      role: user.role ?? 'shop_owner',
+    };
     if (user.email) {
       payload.email = user.email;
     }
