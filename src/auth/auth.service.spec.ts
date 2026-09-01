@@ -110,7 +110,6 @@ describe('AuthService', () => {
       const tokens = await service.login({
         email: 'alice@example.com',
         password: 'S3curePass!',
-        role: 'shop_owner',
       });
 
       expect(mockedArgon2.verify).toHaveBeenCalledWith(

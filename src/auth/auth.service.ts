@@ -37,12 +37,10 @@ export class AuthService {
    */
   async login(dto: LoginDto): Promise<TokensDto> {
     const user = await this.usersService.findByEmail(dto.email);
-    const role = dto.role ?? 'shop_owner';
 
     if (
       !user ||
       !user.passwordHash ||
-      user.role !== role ||
       !(await argon2.verify(user.passwordHash, dto.password))
     ) {
       throw new UnauthorizedException('Invalid credentials');
