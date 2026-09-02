@@ -1,11 +1,13 @@
 import { ConflictException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { type UserRole } from '../auth/auth.types';
 import { User } from './entities/user.entity';
 
 export interface CreateUserData {
   email: string;
   passwordHash: string;
+  role: UserRole;
 }
 
 @Injectable()
@@ -67,6 +69,7 @@ export class UsersService {
     const user = this.usersRepository.create({
       email,
       passwordHash: data.passwordHash,
+      role: data.role,
     });
     return this.usersRepository.save(user);
   }

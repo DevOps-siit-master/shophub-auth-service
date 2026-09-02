@@ -26,6 +26,7 @@ export class AuthService {
     const user = await this.usersService.create({
       email: dto.email,
       passwordHash,
+      role: dto.role ?? 'shop_owner',
     });
     return this.issueTokens(user);
   }
@@ -36,6 +37,7 @@ export class AuthService {
    */
   async login(dto: LoginDto): Promise<TokensDto> {
     const user = await this.usersService.findByEmail(dto.email);
+
     if (
       !user ||
       !user.passwordHash ||
@@ -71,7 +73,10 @@ export class AuthService {
    * path (email/password and SIWE), so the token shape stays identical.
    */
   async issueTokens(user: User): Promise<TokensDto> {
-    const payload: JwtPayload = { sub: user.id };
+    const payload: JwtPayload = {
+      sub: user.id,
+      role: user.role ?? 'shop_owner',
+    };
     if (user.email) {
       payload.email = user.email;
     }

@@ -1,3 +1,6 @@
+export const USER_ROLES = ['shop_owner', 'customer'] as const;
+export type UserRole = (typeof USER_ROLES)[number];
+
 /**
  * Shape of the JWT payload signed for both access and refresh tokens.
  * `sub` is the user id (standard JWT subject claim).
@@ -6,6 +9,7 @@ export interface JwtPayload {
   sub: string;
   email?: string;
   walletAddress?: string;
+  role?: UserRole;
 }
 
 /**
@@ -16,4 +20,5 @@ export interface AuthUser {
   userId: string;
   email?: string;
   walletAddress?: string;
+  role: UserRole;
 }

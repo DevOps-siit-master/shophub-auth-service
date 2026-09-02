@@ -21,6 +21,7 @@ describe('AuthService', () => {
     id: 'user-1',
     email: 'alice@example.com',
     passwordHash: 'stored-hash',
+    role: 'shop_owner',
     createdAt: new Date(),
     updatedAt: new Date(),
   };
@@ -63,14 +64,24 @@ describe('AuthService', () => {
       const tokens = await service.register({
         email: 'alice@example.com',
         password: 'S3curePass!',
+        role: 'shop_owner',
       });
 
       expect(mockedArgon2.hash).toHaveBeenCalledWith('S3curePass!');
       expect(usersService.create).toHaveBeenCalledWith({
         email: 'alice@example.com',
         passwordHash: 'new-hash',
+        role: 'shop_owner',
       });
       expect(jwtService.signAsync).toHaveBeenCalledTimes(2);
+      expect(jwtService.signAsync).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sub: 'user-1',
+          email: 'alice@example.com',
+          role: 'shop_owner',
+        }),
+        expect.any(Object),
+      );
       expect(tokens).toEqual({
         accessToken: 'signed-token',
         refreshToken: 'signed-token',
@@ -85,6 +96,7 @@ describe('AuthService', () => {
         service.register({
           email: 'alice@example.com',
           password: 'S3curePass!',
+          role: 'shop_owner',
         }),
       ).rejects.toBeInstanceOf(ConflictException);
     });
@@ -103,6 +115,10 @@ describe('AuthService', () => {
       expect(mockedArgon2.verify).toHaveBeenCalledWith(
         'stored-hash',
         'S3curePass!',
+      );
+      expect(jwtService.signAsync).toHaveBeenCalledWith(
+        expect.objectContaining({ sub: 'user-1', role: 'shop_owner' }),
+        expect.any(Object),
       );
       expect(tokens.accessToken).toBe('signed-token');
     });

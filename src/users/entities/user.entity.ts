@@ -6,6 +6,7 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
+import { USER_ROLES, type UserRole } from '../../auth/auth.types';
 
 /**
  * A registered ShopHub user.
@@ -30,6 +31,14 @@ export class User {
   @Index({ unique: true })
   @Column({ name: 'wallet_address', type: 'varchar', nullable: true })
   walletAddress: string | null;
+
+  @Column({
+    type: 'varchar',
+    nullable: false,
+    default: 'shop_owner',
+    enum: USER_ROLES,
+  })
+  role: UserRole;
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
