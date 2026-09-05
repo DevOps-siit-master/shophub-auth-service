@@ -16,6 +16,8 @@ async function bootstrap() {
     }),
   );
 
+  app.enableCors({ origin: process.env.CORS_ORIGIN ?? '*' });
+
   // Registered before the router so it counts every request — including
   // guard-rejected (401/403) and unmatched (404) ones (spec 4.1).
   const httpMetrics = app.get(HttpMetricsMiddleware);
