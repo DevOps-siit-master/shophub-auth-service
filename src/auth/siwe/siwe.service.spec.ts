@@ -1,14 +1,15 @@
 import { UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Test, TestingModule } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
 import { generateNonce, SiweMessage } from 'siwe';
-import { Repository } from 'typeorm';
 import { User } from '../../users/entities/user.entity';
 import { UsersService } from '../../users/users.service';
 import { AuthService } from '../auth.service';
 import { SiweService } from './siwe.service';
-import { SiweNonce } from './entities/siwe-nonce.entity';
+import { NONCE_REPOSITORY, NonceRepository } from './nonce-repository.adapter';
+
+/** Mirrors the private NONCE_TTL_MS in siwe.service.ts. */
+const NONCE_TTL_MS = 5 * 60 * 1000;
 
 jest.mock('siwe');
 const MockedSiweMessage = SiweMessage as jest.MockedClass<typeof SiweMessage>;
@@ -18,9 +19,7 @@ const mockedGenerateNonce = generateNonce as jest.MockedFunction<
 
 describe('SiweService', () => {
   let service: SiweService;
-  let nonceRepo: jest.Mocked<
-    Pick<Repository<SiweNonce>, 'findOne' | 'delete' | 'save' | 'create'>
-  >;
+  let nonceRepo: jest.Mocked<NonceRepository>;
   let usersService: jest.Mocked<Pick<UsersService, 'findOrCreateByWallet'>>;
   let authService: jest.Mocked<Pick<AuthService, 'issueTokens'>>;
 
@@ -38,10 +37,8 @@ describe('SiweService', () => {
     jest.clearAllMocks();
 
     nonceRepo = {
-      findOne: jest.fn(),
-      delete: jest.fn().mockResolvedValue({ affected: 1 }),
-      save: jest.fn(),
-      create: jest.fn().mockImplementation((data) => data as SiweNonce),
+      consume: jest.fn(),
+      issue: jest.fn(),
     };
     usersService = { findOrCreateByWallet: jest.fn() };
     authService = { issueTokens: jest.fn().mockResolvedValue(tokens) };
@@ -50,7 +47,7 @@ describe('SiweService', () => {
     const moduleRef: TestingModule = await Test.createTestingModule({
       providers: [
         SiweService,
-        { provide: getRepositoryToken(SiweNonce), useValue: nonceRepo },
+        { provide: NONCE_REPOSITORY, useValue: nonceRepo },
         { provide: ConfigService, useValue: configService },
         { provide: UsersService, useValue: usersService },
         { provide: AuthService, useValue: authService },
@@ -65,34 +62,22 @@ describe('SiweService', () => {
   });
 
   describe('createNonce', () => {
-    it('purges expired nonces, stores a fresh one with a TTL and returns it', async () => {
+    it('issues a fresh nonce with the standard TTL and returns it', async () => {
       mockedGenerateNonce.mockReturnValue('fresh-nonce');
-      let saved: SiweNonce | undefined;
-      nonceRepo.save.mockImplementation((entity) => {
-        saved = entity as SiweNonce;
-        return Promise.resolve(saved);
-      });
+      nonceRepo.issue.mockResolvedValue(undefined);
 
       const result = await service.createNonce();
 
-      expect(nonceRepo.delete).toHaveBeenCalled();
-      expect(saved?.nonce).toBe('fresh-nonce');
-      expect(saved?.expiresAt.getTime()).toBeGreaterThan(Date.now());
+      expect(nonceRepo.issue).toHaveBeenCalledWith('fresh-nonce', NONCE_TTL_MS);
       expect(result).toEqual({ nonce: 'fresh-nonce' });
     });
   });
 
   describe('verify', () => {
-    const validStored = (): SiweNonce => ({
-      nonce: 'issued-nonce',
-      expiresAt: new Date(Date.now() + 60_000),
-      createdAt: new Date(),
-    });
-
     it('verifies the signature, consumes the nonce and returns tokens', async () => {
       const verify = jest.fn().mockResolvedValue({ success: true });
       stubSiweMessage('issued-nonce', verify);
-      nonceRepo.findOne.mockResolvedValue(validStored());
+      nonceRepo.consume.mockResolvedValue(true);
       const user = {
         id: 'user-1',
         walletAddress: address.toLowerCase(),
@@ -104,11 +89,10 @@ describe('SiweService', () => {
         signature: '0xsig',
       });
 
+      expect(nonceRepo.consume).toHaveBeenCalledWith('issued-nonce');
       expect(verify).toHaveBeenCalledWith(
         expect.objectContaining({ signature: '0xsig', nonce: 'issued-nonce' }),
       );
-      // Nonce is consumed (single use).
-      expect(nonceRepo.delete).toHaveBeenCalledWith({ nonce: 'issued-nonce' });
       expect(usersService.findOrCreateByWallet).toHaveBeenCalledWith(address);
       expect(authService.issueTokens).toHaveBeenCalledWith(user);
       expect(result).toEqual(tokens);
@@ -124,25 +108,10 @@ describe('SiweService', () => {
       ).rejects.toBeInstanceOf(UnauthorizedException);
     });
 
-    it('rejects a nonce that was never issued', async () => {
+    it('rejects a nonce that cannot be consumed (never issued or expired)', async () => {
       const verify = jest.fn();
       stubSiweMessage('issued-nonce', verify);
-      nonceRepo.findOne.mockResolvedValue(null);
-
-      await expect(
-        service.verify({ message: 'msg', signature: '0xsig' }),
-      ).rejects.toBeInstanceOf(UnauthorizedException);
-      expect(verify).not.toHaveBeenCalled();
-    });
-
-    it('rejects an expired nonce', async () => {
-      const verify = jest.fn();
-      stubSiweMessage('issued-nonce', verify);
-      nonceRepo.findOne.mockResolvedValue({
-        nonce: 'issued-nonce',
-        expiresAt: new Date(Date.now() - 1_000),
-        createdAt: new Date(),
-      });
+      nonceRepo.consume.mockResolvedValue(false);
 
       await expect(
         service.verify({ message: 'msg', signature: '0xsig' }),
@@ -153,7 +122,7 @@ describe('SiweService', () => {
     it('rejects when signature verification fails', async () => {
       const verify = jest.fn().mockRejectedValue(new Error('bad signature'));
       stubSiweMessage('issued-nonce', verify);
-      nonceRepo.findOne.mockResolvedValue(validStored());
+      nonceRepo.consume.mockResolvedValue(true);
 
       await expect(
         service.verify({ message: 'msg', signature: '0xbad' }),

@@ -20,7 +20,7 @@ export class UsersService {
   ) {}
 
   findByEmail(email: string): Promise<User | null> {
-    return this.usersRepository.findByEmail(email);
+    return this.usersRepository.findByEmail(this.normalizeEmail(email));
   }
 
   findById(id: string): Promise<User | null> {

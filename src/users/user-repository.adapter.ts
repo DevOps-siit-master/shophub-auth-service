@@ -9,10 +9,13 @@ export interface CreateUserData {
   role: UserRole;
 }
 
+// Declared as function-typed properties (not method shorthand) so mock
+// references like `expect(repo.findByEmail).toHaveBeenCalledWith(...)` don't
+// trip @typescript-eslint/unbound-method in tests.
 export interface UserRepository {
-  findById(id: string): Promise<User | null>;
-  findByEmail(email: string): Promise<User | null>;
-  findByWalletAddress(walletAddress: string): Promise<User | null>;
-  createWithEmail(data: CreateUserData): Promise<User | null>;
-  findOrCreateByWallet(walletAddress: string): Promise<User>;
+  findById: (id: string) => Promise<User | null>;
+  findByEmail: (email: string) => Promise<User | null>;
+  findByWalletAddress: (walletAddress: string) => Promise<User | null>;
+  createWithEmail: (data: CreateUserData) => Promise<User | null>;
+  findOrCreateByWallet: (walletAddress: string) => Promise<User>;
 }
