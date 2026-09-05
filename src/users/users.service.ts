@@ -1,8 +1,10 @@
-import { ConflictException, Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { ConflictException, Inject, Injectable } from '@nestjs/common';
 import { type UserRole } from '../auth/auth.types';
 import { User } from './entities/user.entity';
+import {
+  USER_REPOSITORY,
+  type UserRepository,
+} from './user-repository.adapter';
 
 export interface CreateUserData {
   email: string;
@@ -13,24 +15,22 @@ export interface CreateUserData {
 @Injectable()
 export class UsersService {
   constructor(
-    @InjectRepository(User)
-    private readonly usersRepository: Repository<User>,
+    @Inject(USER_REPOSITORY)
+    private readonly usersRepository: UserRepository,
   ) {}
 
   findByEmail(email: string): Promise<User | null> {
-    return this.usersRepository.findOne({
-      where: { email: this.normalizeEmail(email) },
-    });
+    return this.usersRepository.findByEmail(email);
   }
 
   findById(id: string): Promise<User | null> {
-    return this.usersRepository.findOne({ where: { id } });
+    return this.usersRepository.findById(id);
   }
 
   findByWalletAddress(walletAddress: string): Promise<User | null> {
-    return this.usersRepository.findOne({
-      where: { walletAddress: this.normalizeWallet(walletAddress) },
-    });
+    return this.usersRepository.findByWalletAddress(
+      this.normalizeWallet(walletAddress),
+    );
   }
 
   /**
@@ -39,39 +39,20 @@ export class UsersService {
    */
   async findOrCreateByWallet(walletAddress: string): Promise<User> {
     const normalized = this.normalizeWallet(walletAddress);
-
-    const existing = await this.findByWalletAddress(normalized);
-    if (existing) {
-      return existing;
-    }
-
-    try {
-      const user = this.usersRepository.create({ walletAddress: normalized });
-      return await this.usersRepository.save(user);
-    } catch {
-      // Lost a race against a concurrent first login — the row now exists.
-      const user = await this.findByWalletAddress(normalized);
-      if (!user) {
-        throw new ConflictException('Could not create wallet account');
-      }
-      return user;
-    }
+    return this.usersRepository.findOrCreateByWallet(normalized);
   }
 
   async create(data: CreateUserData): Promise<User> {
     const email = this.normalizeEmail(data.email);
 
-    const existing = await this.usersRepository.findOne({ where: { email } });
-    if (existing) {
+    const user = await this.usersRepository.createWithEmail({
+      ...data,
+      email: email,
+    });
+    if (!user) {
       throw new ConflictException('A user with this email already exists');
     }
-
-    const user = this.usersRepository.create({
-      email,
-      passwordHash: data.passwordHash,
-      role: data.role,
-    });
-    return this.usersRepository.save(user);
+    return user;
   }
 
   private normalizeEmail(email: string): string {
