@@ -1,27 +1,26 @@
 import { ConflictException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
 import { User } from './entities/user.entity';
 import { UsersService } from './users.service';
+import { USER_REPOSITORY, UserRepository } from './user-repository.adapter';
 
 describe('UsersService', () => {
   let service: UsersService;
-  let repository: jest.Mocked<
-    Pick<Repository<User>, 'findOne' | 'create' | 'save'>
-  >;
+  let repository: jest.Mocked<UserRepository>;
 
   beforeEach(async () => {
     repository = {
-      findOne: jest.fn(),
-      create: jest.fn(),
-      save: jest.fn(),
+      findByWalletAddress: jest.fn(),
+      findOrCreateByWallet: jest.fn(),
+      findByEmail: jest.fn(),
+      findById: jest.fn(),
+      createWithEmail: jest.fn(),
     };
 
     const moduleRef: TestingModule = await Test.createTestingModule({
       providers: [
         UsersService,
-        { provide: getRepositoryToken(User), useValue: repository },
+        { provide: USER_REPOSITORY, useValue: repository },
       ],
     }).compile();
 
@@ -34,29 +33,25 @@ describe('UsersService', () => {
 
   describe('findByEmail', () => {
     it('normalizes the email before querying', async () => {
-      repository.findOne.mockResolvedValue(null);
+      repository.findByEmail.mockResolvedValue(null);
 
       await service.findByEmail('  Alice@Example.COM ');
 
-      expect(repository.findOne).toHaveBeenCalledWith({
-        where: { email: 'alice@example.com' },
-      });
+      expect(repository.findByEmail).toHaveBeenCalledWith('alice@example.com');
     });
   });
 
   describe('create', () => {
     it('persists a normalized user when the email is free', async () => {
       const saved = { id: 'uuid-1', email: 'alice@example.com' } as User;
-      repository.findOne.mockResolvedValue(null);
-      repository.create.mockImplementation((data) => data as User);
-      repository.save.mockResolvedValue(saved);
+      repository.createWithEmail.mockResolvedValue(saved);
 
       const result = await service.create({
         email: 'Alice@Example.com',
         passwordHash: 'hashed',
       });
 
-      expect(repository.create).toHaveBeenCalledWith({
+      expect(repository.createWithEmail).toHaveBeenCalledWith({
         email: 'alice@example.com',
         passwordHash: 'hashed',
       });
@@ -64,13 +59,11 @@ describe('UsersService', () => {
     });
 
     it('rejects a duplicate email with ConflictException', async () => {
-      repository.findOne.mockResolvedValue({ id: 'existing' } as User);
+      repository.createWithEmail.mockResolvedValue(null);
 
       await expect(
         service.create({ email: 'alice@example.com', passwordHash: 'hashed' }),
       ).rejects.toBeInstanceOf(ConflictException);
-
-      expect(repository.save).not.toHaveBeenCalled();
     });
   });
 });

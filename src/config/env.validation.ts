@@ -3,18 +3,26 @@ import * as Joi from 'joi';
 /**
  * Validation schema for environment variables.
  */
+
+const requiredForPostgres = {
+  is: 'postgres',
+  then: Joi.required(),
+  otherwise: Joi.optional(),
+};
+
 export const validationSchema = Joi.object({
   NODE_ENV: Joi.string()
     .valid('development', 'test', 'production')
     .default('development'),
   PORT: Joi.number().default(3000),
 
-  // Database (PostgreSQL)
+  // Database (PostgreSQL or REDIS)
   DATABASE_HOST: Joi.string().default('localhost'),
   DATABASE_PORT: Joi.number().default(5433),
-  DATABASE_USER: Joi.string().required(),
-  DATABASE_PASSWORD: Joi.string().required(),
-  DATABASE_NAME: Joi.string().required(),
+  DATABASE_KIND: Joi.string().valid('postgres', 'redis').default('postgres'),
+  DATABASE_USER: Joi.string().when('DATABASE_KIND', requiredForPostgres),
+  DATABASE_NAME: Joi.string().when('DATABASE_KIND', requiredForPostgres),
+  DATABASE_PASSWORD: Joi.string().when('DATABASE_KIND', requiredForPostgres),
 
   // JWT (email/password auth)
   JWT_ACCESS_SECRET: Joi.string().required(),
